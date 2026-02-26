@@ -7,11 +7,7 @@ class Character {
   final Color color;
   final String imagePath;
 
-  Character({
-    required this.name,
-    required this.color,
-    required this.imagePath,
-  });
+  Character({required this.name, required this.color, required this.imagePath});
 }
 
 class CharacterSelectScreen extends StatefulWidget {
@@ -88,7 +84,9 @@ class _CharacterSelectScreenState extends State<CharacterSelectScreen> {
     if (_timer.isActive) _timer.cancel();
 
     // 非同步淡出當前音樂，實際播放關卡背景音樂由遊戲畫面負責啟動
-    audioManager.fadeOut(duration: const Duration(milliseconds: 800)).catchError((e) {});
+    audioManager
+        .fadeOut(duration: const Duration(milliseconds: 800))
+        .catchError((e) {});
 
     // 讓使用者能看見已選擇狀態，短暫延遲後立即返回選擇結果
     Future.delayed(const Duration(milliseconds: 250), () {
@@ -131,7 +129,10 @@ class _CharacterSelectScreenState extends State<CharacterSelectScreen> {
                   ),
                   const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: _timeRemaining <= 10 ? Colors.red : Colors.blue,
                       borderRadius: BorderRadius.circular(8),
@@ -187,17 +188,17 @@ class _CharacterSelectScreenState extends State<CharacterSelectScreen> {
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: isSelected
                             ? [
-                          BoxShadow(
-                            color: Color.fromRGBO(
-                              character.color.red,
-                              character.color.green,
-                              character.color.blue,
-                              0.5,
-                            ),
-                            blurRadius: 20,
-                            spreadRadius: 5,
-                          ),
-                        ]
+                                BoxShadow(
+                                  color: Color.fromRGBO(
+                                    character.color.red,
+                                    character.color.green,
+                                    character.color.blue,
+                                    0.5,
+                                  ),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
+                                ),
+                              ]
                             : [],
                       ),
                       child: Column(
@@ -225,7 +226,6 @@ class _CharacterSelectScreenState extends State<CharacterSelectScreen> {
                           const SizedBox(height: 8),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 10),
-
                           ),
                           if (isSelected)
                             Padding(
@@ -261,10 +261,7 @@ class _CharacterSelectScreenState extends State<CharacterSelectScreen> {
               child: Text(
                 '點擊選擇角色，或等待倒數計時結束自動選擇第一個角色',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                ),
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
               ),
             ),
           ],

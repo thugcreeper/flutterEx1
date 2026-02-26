@@ -19,7 +19,10 @@ class AudioManager {
       log('AudioManager: play -> $assetPath', name: 'AudioManager');
       await _audioPlayer.setAsset(assetPath);
       await _audioPlayer.play();
-      log('AudioManager: playing -> ${_audioPlayer.playing}', name: 'AudioManager');
+      log(
+        'AudioManager: playing -> ${_audioPlayer.playing}',
+        name: 'AudioManager',
+      );
     } catch (e) {
       log('Error playing audio: $e', name: 'AudioManager', error: e);
     }
@@ -62,7 +65,10 @@ class AudioManager {
   Future<void> fadeOut({
     Duration duration = const Duration(milliseconds: 1000),
   }) async {
-    log('AudioManager: fadeOut start (duration: $duration)', name: 'AudioManager');
+    log(
+      'AudioManager: fadeOut start (duration: $duration)',
+      name: 'AudioManager',
+    );
     final startVolume = _audioPlayer.volume;
     final steps = 20;
     final stepDuration = duration ~/ steps;
