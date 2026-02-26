@@ -44,7 +44,7 @@ class _MainMenuState extends State<MainMenu> {
           // ── 背景圖：完整顯示，不截斷 ────────────────────────
           Positioned.fill(
             child: Image.asset(
-              'assets/background/mainBg.gif',
+              'background/mainBg.gif',
               fit: BoxFit.contain,          // 完整顯示，不裁切
               alignment: Alignment.center,
             ),
@@ -52,7 +52,7 @@ class _MainMenuState extends State<MainMenu> {
 
           // ── 半透明遮罩，提升文字可讀性 ──────────────────────
           Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.1)),
+            child: Container(color: Colors.black.withOpacity(0.45)),
           ),
 
           // ── 主內容 ───────────────────────────────────────────
@@ -60,9 +60,7 @@ class _MainMenuState extends State<MainMenu> {
             child: SingleChildScrollView(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-
-                  const SizedBox(height: 50),
+                children: [ 
 
                   if (!_showStory) ...[
                     Container(
@@ -363,13 +361,18 @@ class _GameScreenState extends State<GameScreen> {
     );
 
     if (result != null) {
+      // 依角色名稱判斷 index 並設定玩家顏色
+      const charNames = ['comar', 'matar', 'ofi', 'ier'];
+      final charIndex = charNames.indexOf(result.name);
+      _game.setPlayerColor(charIndex >= 0 ? charIndex : 0);
+
       setState(() {
         _selectedCharacter = result;
         _characterSelected = true;
       });
       try {
         log('Main: triggering levelbgm play', name: 'Main');
-        AudioManager().play('assets/audio/levelbgm.mp3').then((_) async {
+        AudioManager().play('audio/levelbgm.mp3').then((_) async {
           AudioManager().setLooping(true);
           try {
             await AudioManager().fadeIn(
@@ -418,49 +421,93 @@ class _GameScreenState extends State<GameScreen> {
         body: Stack(
           children: [
             GameWidget(game: _game),
+            // ── HUD：左上角三列分開顯示 ─────────────────────
             Positioned(
-              top: 8,
-              left: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black26,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.white24),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ValueListenableBuilder<int>(
-                      valueListenable: _game.scoreNotifier,
-                      builder: (context, score, child) {
-                        return Text(
-                          '分數: $score',
-                          style: const TextStyle(color: Colors.white),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 16),
-                    const Icon(
-                      Icons.brightness_5,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    ValueListenableBuilder<int>(
-                      valueListenable: _game.grenadesAvailableNotifier,
-                      builder: (context, value, child) {
-                        return Text(
-                          '手榴彈: $value',
-                          style: const TextStyle(color: Colors.white),
-                        );
-                      },
-                    ),
-                  ],
-                ),
+              top: 10,
+              left: 12,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 愛心
+                  ValueListenableBuilder<int>(
+                    valueListenable: _game.livesNotifier,
+                    builder: (context, lives, child) {
+                      return Row(
+                        children: List.generate(3, (i) => Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Icon(
+                            i < lives ? Icons.favorite : Icons.favorite_border,
+                            color: i < lives ? Colors.red : Colors.grey,
+                            size: 24,
+                          ),
+                        )),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  // 彈藥列（Grenade + Ammo 同一行）
+                  Row(
+                    children: [
+                      ValueListenableBuilder<int>(
+                        valueListenable: _game.grenadesAvailableNotifier,
+                        builder: (context, grenades, child) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black45,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text('Grenade  x$grenades',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              )),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ValueListenableBuilder<String>(
+                        valueListenable: _game.ammoNotifier,
+                        builder: (context, ammo, child) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black45,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text('Ammo  $ammo',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              )),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // 分數
+                  ValueListenableBuilder<int>(
+                    valueListenable: _game.scoreNotifier,
+                    builder: (context, score, child) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black45,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text('Score  $score',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          )),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
           ],

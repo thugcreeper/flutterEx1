@@ -69,7 +69,7 @@ class _CharacterSelectScreenState extends State<CharacterSelectScreen> {
 
     // 背景音樂非同步播放，若發生錯誤則不影響倒數
     try {
-      audioManager.play('assets/audio/selectPlayer.mp3').then((_) {
+      audioManager.play('audio/selectPlayer.mp3').then((_) {
         audioManager.setLooping(true);
       });
     } catch (e) {
