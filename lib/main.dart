@@ -6,7 +6,7 @@ import 'screens/character_select_screen.dart';
 import 'services/audio_manager.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const MyApp()); // 啟動 Flutter 應用程式，根組件為 MyApp
 }
 
 class MyApp extends StatelessWidget {
@@ -15,12 +15,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Metal Slug Game',
+      title: 'Metal Slug Game', // 應用程式標題
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple), // 主題顏色
+        useMaterial3: true, // 使用 Material3 風格
       ),
-      home: const MainMenu(),
+      home: const MainMenu(), // 首頁為 MainMenu
     );
   }
 }
@@ -29,23 +29,23 @@ class MainMenu extends StatefulWidget {
   const MainMenu({super.key});
 
   @override
-  State<MainMenu> createState() => _MainMenuState();
+  State<MainMenu> createState() => _MainMenuState(); // 建立狀態
 }
 
 class _MainMenuState extends State<MainMenu> {
-  bool _showStory = false;
+  bool _showStory = false; // 控制是否顯示故事與操作說明
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
-        fit: StackFit.expand,   // 讓 Stack 撐滿整個 Scaffold body
+        fit: StackFit.expand, // 讓 Stack 撐滿整個 Scaffold body
         children: [
           // ── 背景圖：完整顯示，不截斷 ────────────────────────
           Positioned.fill(
             child: Image.asset(
               'background/mainBg.gif',
-              fit: BoxFit.contain,          // 完整顯示，不裁切
+              fit: BoxFit.contain, // 完整顯示，不裁切
               alignment: Alignment.center,
             ),
           ),
@@ -63,6 +63,7 @@ class _MainMenuState extends State<MainMenu> {
                 children: [ 
 
                   if (!_showStory) ...[
+                    // 首頁簡介與按鈕
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 30),
                       padding: const EdgeInsets.all(20),
@@ -83,6 +84,7 @@ class _MainMenuState extends State<MainMenu> {
 
                     Column(
                       children: [
+                        // 開始遊戲按鈕
                         ElevatedButton.icon(
                           onPressed: () {
                             Navigator.of(context).push(
@@ -106,6 +108,7 @@ class _MainMenuState extends State<MainMenu> {
                           ),
                         ),
                         const SizedBox(height: 20),
+                        // 故事與操作按鈕
                         ElevatedButton.icon(
                           onPressed: () {
                             setState(() {
@@ -129,6 +132,7 @@ class _MainMenuState extends State<MainMenu> {
                       ],
                     ),
                   ] else ...[
+                    // 故事與操作說明頁面
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 30),
                       padding: const EdgeInsets.all(20),
@@ -140,6 +144,7 @@ class _MainMenuState extends State<MainMenu> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // 故事標題
                           Center(
                             child: Text(
                               '故事簡介',
@@ -153,6 +158,7 @@ class _MainMenuState extends State<MainMenu> {
                             ),
                           ),
                           const SizedBox(height: 12),
+                          // 故事內容框
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
@@ -192,6 +198,7 @@ class _MainMenuState extends State<MainMenu> {
                           ),
                           const SizedBox(height: 24),
 
+                          // 操作方法與遊戲說明分欄
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -199,6 +206,7 @@ class _MainMenuState extends State<MainMenu> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    // 操作方法標題
                                     Center(
                                       child: Text(
                                         '操作方法',
@@ -212,6 +220,7 @@ class _MainMenuState extends State<MainMenu> {
                                       ),
                                     ),
                                     const SizedBox(height: 12),
+                                    // 操作按鍵列表
                                     _buildControlRow('A 鍵', '向左走'),
                                     _buildControlRow('D 鍵', '向右走'),
                                     _buildControlRow('W 鍵', '向上瞄準'),
@@ -227,6 +236,7 @@ class _MainMenuState extends State<MainMenu> {
                                 child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
+                                      // 遊戲說明標題
                                       Center(
                                         child: Text(
                                           '遊戲說明',
@@ -240,6 +250,7 @@ class _MainMenuState extends State<MainMenu> {
                                         ),
                                       ),
                                       const SizedBox(height: 12),
+                                      // 遊戲道具與效果提示
                                       _buildTipRow('🔵 藍色方塊', '敵人，碰到會掉血'),
                                       _buildTipRow('💛 黃色圓點', '你的子彈，擊中敵人造成傷害'),
                                       _buildTipRow('💎 青色圓點', '敵人的子彈，碰到玩家會掉血'),
@@ -259,6 +270,7 @@ class _MainMenuState extends State<MainMenu> {
                       ),
                     ),
                     const SizedBox(height: 30),
+                    // 返回主頁面按鈕
                     ElevatedButton.icon(
                       onPressed: () {
                         setState(() {
@@ -282,6 +294,7 @@ class _MainMenuState extends State<MainMenu> {
     );
   }
 
+  // 建立控制按鍵列
   Widget _buildControlRow(String key, String action) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -314,6 +327,7 @@ class _MainMenuState extends State<MainMenu> {
     );
   }
 
+  // 建立遊戲提示列
   Widget _buildTipRow(String icon, String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -344,19 +358,20 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
-  Character? _selectedCharacter;
-  bool _characterSelected = false;
-  late final MetalSlugGame _game;
+  Character? _selectedCharacter; // 選中的角色
+  bool _characterSelected = false; // 是否已選角色
+  late final MetalSlugGame _game; // 遊戲核心物件
 
   @override
   void initState() {
     super.initState();
-    _game = MetalSlugGame();
+    _game = MetalSlugGame(); // 初始化遊戲
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showCharacterSelection();
+      _showCharacterSelection(); // 畫面建立後立即顯示角色選擇
     });
   }
 
+  // 顯示角色選擇畫面
   void _showCharacterSelection() async {
     final result = await Navigator.of(context).push<Character>(
       MaterialPageRoute(
@@ -393,6 +408,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     if (!_characterSelected) {
+      // 尚未選角時顯示載入畫面
       return Scaffold(
         body: Container(
           decoration: BoxDecoration(
@@ -409,13 +425,13 @@ class _GameScreenState extends State<GameScreen> {
 
     return WillPopScope(
       onWillPop: () async {
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(); // 返回主選單
         return false;
       },
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            'Metal Slug 2D Game - ${_selectedCharacter?.name ?? ''}',
+            'Metal Slug 2D Game - ${_selectedCharacter?.name ?? ''}', // 顯示角色名稱
           ),
           centerTitle: true,
           leading: IconButton(
@@ -425,17 +441,18 @@ class _GameScreenState extends State<GameScreen> {
         ),
         body: Stack(
           children: [
+            // ── 遊戲畫面 ────────────────────────────────
             GameWidget(
               game: _game..onReturnToMenu = () => Navigator.of(context).pop(),
             ),
-            // ── HUD：左上角三列分開顯示 ─────────────────────
+            // ── HUD：左上角三列顯示 ─────────────────────
             Positioned(
               top: 10,
               left: 12,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 愛心
+                  // 愛心生命顯示
                   ValueListenableBuilder<int>(
                     valueListenable: _game.livesNotifier,
                     builder: (context, lives, child) {
@@ -452,7 +469,7 @@ class _GameScreenState extends State<GameScreen> {
                     },
                   ),
                   const SizedBox(height: 6),
-                  // 彈藥列（Grenade + Ammo 同一行）
+                  // 彈藥列（手榴彈與子彈）
                   Row(
                     children: [
                       ValueListenableBuilder<int>(
@@ -495,7 +512,7 @@ class _GameScreenState extends State<GameScreen> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  // 分數
+                  // 分數顯示
                   ValueListenableBuilder<int>(
                     valueListenable: _game.scoreNotifier,
                     builder: (context, score, child) {
