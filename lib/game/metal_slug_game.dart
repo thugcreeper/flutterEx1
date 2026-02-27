@@ -4,10 +4,18 @@ import 'package:flame/game.dart';
 import 'package:flame/input.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
-import '../services/audio_manager.dart';
+import 'Grenade.dart';
+import 'Bullet.dart';
+import 'Explosion.dart';
+import 'HeavyWeapon.dart';
+import 'Enemy.dart';
+import 'Platform.dart';
+import 'Tank.dart';
+import 'loot.dart';
+import 'Boss.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'dart:ui' as ui;
+
 
 Future<ui.Image> loadUiImage(String assetPath) async {
   final data = await rootBundle.load('assets/$assetPath');
@@ -37,437 +45,37 @@ Future<void> _playSfx(String assetPath) async {
   }
 }
 
-// ────────────────────────────────────────────────────────────
-// Bullet
-// ────────────────────────────────────────────────────────────
-class Bullet {
-  Vector2 position;
-  Vector2 velocity;
-  bool isPlayerBullet;
-  double radius;
-  Color? color; // 若指定則使用此色，否則用預設
 
-  Bullet({
+//顯示戰利品得分的浮動文字
+class FloatingText {
+  final String text;
+  final Vector2 position;
+  final Color color;
+  double timer; // 剩餘顯示時間
+
+  FloatingText({
+    required this.text,
     required this.position,
-    required this.velocity,
-    required this.isPlayerBullet,
-    this.radius = 3,
-    this.color,
+    required this.color,
+    this.timer = 2.0, // 顯示2秒
   });
-
-  void update(double dt) => position += velocity * dt;
-
-  void render(Canvas canvas) {
-    final c = color ?? (isPlayerBullet ? Colors.yellow : Colors.cyan);
-    canvas.drawCircle(
-      Offset(position.x, position.y),
-      radius,
-      Paint()..color = c,
-    );
-  }
 }
 
-// ────────────────────────────────────────────────────────────
-// Grenade
-// ────────────────────────────────────────────────────────────
-class Grenade {
-  Vector2 position;
-  Vector2 velocity;
-  double gravity = 500;
-  double radius = 6;
-  double explosionRadius = 80;
-  double lifetime = 5.0;
-  double currentTime = 0;
-
-  Grenade({required this.position, required this.velocity});
-
-  void update(double dt) {
-    currentTime += dt;
-    velocity.y += gravity * dt;
-    position += velocity * dt;
-  }
-
-  bool isExpired() => currentTime >= lifetime;
-
-  void render(Canvas canvas) {
-    canvas.drawCircle(
-      Offset(position.x, position.y),
-      radius,
-      Paint()..color = Colors.black,
-    );
-    canvas.drawLine(
-      Offset(position.x, position.y - radius),
-      Offset(position.x, position.y - radius - 5),
-      Paint()
-        ..color = Colors.red
-        ..strokeWidth = 1,
-    );
-  }
-}
-
-// ────────────────────────────────────────────────────────────
-// Explosion
-// ────────────────────────────────────────────────────────────
-class Explosion {
-  Vector2 position;
-  double maxRadius;
-  double currentTime = 0.0;
-  double duration = 0.6;
-
-  Explosion({required this.position, required this.maxRadius});
-
-  void update(double dt) => currentTime += dt;
-  bool get isFinished => currentTime >= duration;
-
-  void render(Canvas canvas) {
-    final t = (currentTime / duration).clamp(0.0, 1.0);
-    final r = maxRadius * t;
-    final alpha = ((1 - t) * 0.9).clamp(0.0, 0.9);
-    canvas.drawCircle(
-      Offset(position.x, position.y),
-      r,
-      Paint()..color = Colors.orange.withOpacity(alpha),
-    );
-    canvas.drawCircle(
-      Offset(position.x, position.y),
-      r * 0.4,
-      Paint()..color = Colors.white.withOpacity((1 - t) * 0.6),
-    );
-  }
-}
-
-// ────────────────────────────────────────────────────────────
-// HeavyWeapon（H 道具箱）
-// ────────────────────────────────────────────────────────────
-class HeavyWeapon {
-  Vector2 position;
-  bool collected = false;
-  static const double size = 24.0;
-
-  HeavyWeapon({required this.position});
-
-  Rect get rect =>
-      Rect.fromLTWH(position.x - size / 2, position.y - size / 2, size, size);
-
-  void render(Canvas canvas) {
-    if (collected) return;
-    // 外框
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..color = const Color(0xFFFFCC00)
-        ..style = PaintingStyle.fill,
-    );
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..color = Colors.orange
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
-    // 字母 H
-    final tp = TextPainter(
-      text: const TextSpan(
-        text: 'H',
-        style: TextStyle(
-          color: Colors.black,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(
-      canvas,
-      Offset(position.x - tp.width / 2, position.y - tp.height / 2),
-    );
-  }
-}
-
-// ────────────────────────────────────────────────────────────
-// Platform
-// ────────────────────────────────────────────────────────────
-class Platform {
-  final double x;
-  final double y;
-  final double width;
-
-  const Platform({required this.x, required this.y, required this.width});
-
-  double get left => x - width / 2;
-  double get right => x + width / 2;
-  double get top => y;
-}
-
-// ────────────────────────────────────────────────────────────
-// Enemy（普通士兵）
-// ────────────────────────────────────────────────────────────
-class Enemy {
-  Vector2 position;
-  double width = 30;
-  double height = 30;
-  double moveSpeed = 50;
-  double direction = 1;
-  double shootTimer = 0;
-  bool isDead = false;
-  double velocityY = 0;
-  static const double _gravity = 600;
-
-  Enemy({required this.position});
-
-  // 生成時把 y 對齊平台頂面，避免第一幀掉落
-  factory Enemy.onPlatform(double x, Platform p) {
-    return Enemy(position: Vector2(x, p.top - 15)); // 15 = height/2
-  }
-
-  void update(double dt, List<Platform> platforms) {
-    if (isDead) return;
-    shootTimer += dt;
-
-    // 重力（velocityY 向下為正）
-    velocityY += _gravity * dt;
-
-    // 先移動 y
-    double nextY = position.y + velocityY * dt;
-
-    // 平台碰撞：掃描「移動前底部」到「移動後底部」之間是否穿越平台頂面
-    Platform? standing;
-    double prevBottom = position.y + height / 2;
-    double nextBottom = nextY + height / 2;
-
-    for (var p in platforms) {
-      bool xOverlap =
-          position.x + width / 2 > p.left && position.x - width / 2 < p.right;
-      // 只要 x 重疊，且這一幀底部越過了平台頂面（從上方穿過）
-      if (xOverlap &&
-          velocityY >= 0 &&
-          prevBottom <= p.top + 2 &&
-          nextBottom >= p.top) {
-        nextY = p.top - height / 2;
-        velocityY = 0;
-        standing = p;
-        break;
-      }
-    }
-
-    position.y = nextY;
-
-    // 水平移動
-    position.x += direction * moveSpeed * dt;
-
-    // 平台邊緣反轉（站在平台上才判斷，不走下去）
-    if (standing != null) {
-      if (position.x - width / 2 < standing.left) {
-        position.x = standing.left + width / 2;
-        direction = 1;
-      } else if (position.x + width / 2 > standing.right) {
-        position.x = standing.right - width / 2;
-        direction = -1;
-      }
-    } else {
-      if (position.x < 15) direction = 1;
-      if (position.x > 785) direction = -1;
-    }
-  }
-
-  void render(Canvas canvas) {
-    if (isDead) return;
-    canvas.drawRect(
-      Rect.fromLTWH(
-        position.x - width / 2,
-        position.y - height / 2,
-        width,
-        height,
-      ),
-      Paint()..color = Colors.blue,
-    );
-    canvas.drawCircle(
-      Offset(position.x - 8, position.y - 8),
-      2,
-      Paint()..color = Colors.white,
-    );
-    canvas.drawCircle(
-      Offset(position.x + 8, position.y - 8),
-      2,
-      Paint()..color = Colors.white,
-    );
-  }
-}
-
-// ────────────────────────────────────────────────────────────
-// Tank（坦克車）
-// ────────────────────────────────────────────────────────────
-class Tank {
-  Vector2 position;
-  double width = 70;
-  double height = 40;
-  double moveSpeed = 30;
-  double direction = -1; // 預設向左（面向玩家）
-  double shootTimer = 0;
-  double shootInterval = 6.0;
-  bool isDead = false;
-  int hp = 30;
-  int grenadeHits = 0;
-  static const int grenadeHitsToKill = 2;
-  double velocityY = 0;
-  static const double _gravity = 600;
-  double hitFlashTimer = 0;
-
-  // 延遲發射佇列：每筆為 (剩餘等待時間, 方向)
-  final List<List<double>> _pendingShots = []; // [remainingDelay, dir]
-
-  Tank({required this.position});
-
-  factory Tank.onPlatform(double x, Platform p) {
-    return Tank(position: Vector2(x, p.top - 20)); // 20 = height/2
-  }
-
-  void update(double dt, List<Platform> platforms) {
-    if (isDead) return;
-    shootTimer += dt;
-    if (hitFlashTimer > 0) hitFlashTimer -= dt;
-
-    // 重力
-    velocityY += _gravity * dt;
-    position.y += velocityY * dt;
-
-    // 平台碰撞（掃描式，防止高速穿透）
-    double prevBottom = position.y + height / 2;
-    double nextY = position.y + velocityY * dt;
-    double nextBottom = nextY + height / 2;
-
-    for (var p in platforms) {
-      bool xOverlap =
-          position.x + width / 2 > p.left && position.x - width / 2 < p.right;
-      if (xOverlap &&
-          velocityY >= 0 &&
-          prevBottom <= p.top + 2 &&
-          nextBottom >= p.top) {
-        nextY = p.top - height / 2;
-        velocityY = 0;
-        break;
-      }
-    }
-    position.y = nextY;
-
-    // 水平移動
-    position.x += direction * moveSpeed * dt;
-
-    // 平台邊緣反轉
-    for (var p in platforms) {
-      bool xOvlp =
-          position.x + width / 2 > p.left && position.x - width / 2 < p.right;
-      bool onTop = (position.y + height / 2 - p.top).abs() < 8;
-      if (xOvlp && onTop) {
-        if (position.x - width / 2 < p.left) {
-          position.x = p.left + width / 2;
-          direction = 1;
-        } else if (position.x + width / 2 > p.right) {
-          position.x = p.right - width / 2;
-          direction = -1;
-        }
-        break;
-      }
-    }
-  }
-
-  // 每 frame 呼叫，回傳本幀應發射的砲彈
-  List<Bullet> updateShoot(double dt, double playerX) {
-    final result = <Bullet>[];
-
-    // 主計時器：到時間就排入 3 顆延遲砲彈
-    shootTimer += dt;
-    if (shootTimer >= shootInterval) {
-      shootTimer = 0;
-      double dir = (playerX < position.x) ? -1.0 : 1.0;
-      // 3 顆：延遲 0、0.1、0.2 秒
-      _pendingShots.add([0.0, dir]);
-      _pendingShots.add([0.1, dir]);
-      _pendingShots.add([0.2, dir]);
-    }
-
-    // 處理延遲佇列
-    final toRemove = <List<double>>[];
-    for (var shot in _pendingShots) {
-      shot[0] -= dt; // 倒計時
-      if (shot[0] <= 0) {
-        double dir = shot[1];
-        double cx = position.x + dir * (width / 2 + 2);
-        double cy = position.y;
-        // cy: 坦克腳底往上 21px = 蹲下時頭頂剛好通過的高度
-        final double bulletCY = position.y + height / 2 - 21;
-        result.add(
-          Bullet(
-            position: Vector2(cx, bulletCY),
-            velocity: Vector2(dir * 280, 0),
-            isPlayerBullet: false,
-            radius: 7,
-            color: Colors.red,
-          ),
-        );
-        toRemove.add(shot);
-      }
-    }
-    for (var s in toRemove) _pendingShots.remove(s);
-
-    return result;
-  }
-
-  void render(Canvas canvas) {
-    if (isDead) return;
-    final bodyColor = hitFlashTimer > 0 ? Colors.white : Colors.brown.shade700;
-
-    // 車體
-    canvas.drawRect(
-      Rect.fromLTWH(
-        position.x - width / 2,
-        position.y - height / 2,
-        width,
-        height,
-      ),
-      Paint()..color = bodyColor,
-    );
-    // 砲塔
-    canvas.drawRect(
-      Rect.fromLTWH(position.x - 18, position.y - height / 2 - 16, 36, 18),
-      Paint()
-        ..color = hitFlashTimer > 0
-            ? Colors.white
-            : const Color.fromARGB(225, 255, 207, 35),
-    );
-    // 砲管
-    double barrelDir = direction;
-    canvas.drawRect(
-      Rect.fromLTWH(
-        barrelDir > 0 ? position.x + 18 : position.x - 18 - 28,
-        position.y - height / 2 - 11,
-        28,
-        8,
-      ),
-      Paint()..color = Colors.grey.shade800,
-    );
-    // 履帶
-    canvas.drawRect(
-      Rect.fromLTWH(
-        position.x - width / 2,
-        position.y + height / 2 - 8,
-        width,
-        8,
-      ),
-      Paint()..color = Colors.grey.shade600,
-    );
-  }
-}
 
 // ────────────────────────────────────────────────────────────
 // MetalSlugGame
 // ────────────────────────────────────────────────────────────
-class MetalSlugGame extends FlameGame with KeyboardEvents {
+class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
   static const double gameWidth = 800;
   static const double gameHeight = 600;
-
+  final List<FloatingText> _floatingTexts = [];
   // ── 角色顏色（由外部 setPlayerColor 設定）────────────────
   Color playerColor = Colors.red;
+
+  // 勝利旗標與回主畫面 callback
+  bool gameVictory = false;
+  VoidCallback? onReturnToMenu;
+  late Rect _returnButtonRect; // 以遊戲座標表示的按鈕區域
 
   void setPlayerColor(int characterIndex) {
     switch (characterIndex) {
@@ -536,6 +144,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
   List<Enemy> enemies = [];
   List<Tank> tanks = [];
   List<Platform> platforms = [];
+  List<Loot> loots = []; // 場上的戰利品
 
   // ── 分數 / 關卡 ───────────────────────────────────────────
   int score = 0;
@@ -565,11 +174,14 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
   // ── 背景圖像 ──────────────────────────────────────────────
   late ui.Image zone1Background;
   late ui.Image zone2Background;
+  late ui.Image zone3Background;
 
   // ────────────────────────────────────────────────────────
   @override
   Future<void> onLoad() async {
     super.onLoad();
+    // 初始化回主選單按鈕（以遊戲座標表示）
+    _returnButtonRect = Rect.fromLTWH(gameWidth / 2 - 100, gameHeight / 2 + 60, 200, 40);
     playerPos = Vector2(100, 300);
 
     
@@ -577,6 +189,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
     try {
         zone1Background = await loadUiImage('background/zone1.jpg');
         zone2Background = await loadUiImage('background/zone2.jpg');
+        zone3Background = await loadUiImage('background/zone3.jpg');
       print('[Background] 背景圖像已加載');
     } catch (e) {
       print('[ERROR] 背景圖像加載失敗: $e');
@@ -602,6 +215,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
     enemies.clear();
     tanks.clear();
     heavyWeapons.clear();
+    loots.clear();
     _transitionTriggered = false;
 
     currentZone = zone;
@@ -636,7 +250,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
         Enemy.onPlatform(620, mid2),
         Enemy.onPlatform(400, hi2),
       ];
-    } else {
+    } else if (zone == 1) {
       // ── Zone 1：開闊平地 + 高台 ────────────────────────
       final groundPlatform = Platform(
         x: gameWidth / 2,
@@ -663,6 +277,18 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
       tanks = [
         Tank.onPlatform(500, groundPlatform),
         Tank.onPlatform(680, groundPlatform),
+      ];
+    } else if (zone == 2) {
+      // ── Zone 3 (Boss 區)：只有地面與魔王
+      final groundPlatform = Platform(
+        x: gameWidth / 2,
+        y: groundY,
+        width: gameWidth,
+      );
+      platforms = [groundPlatform];
+      // 置入一隻 Boss
+      enemies = [
+        Boss(position: Vector2(gameWidth / 2, groundPlatform.top - 120), health: 120),
       ];
     }
 
@@ -717,14 +343,15 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
   @override
   void update(double dt) {
     super.update(dt);
-    if (gameOver) return;
+    if (gameOver || gameVictory) return;
 
     // ── 場景切換過場（黑屏等待）──────────────────────────
     if (_zoneTransiting) {
       _zoneTransitTimer += dt;
       if (_zoneTransitTimer >= _zoneTransitDuration) {
         _zoneTransiting = false;
-        int nextZone = (currentZone + 1) % 2;
+        // 允許循環進入 0,1,2 三個 zone（包含 boss 區 zone==2）
+        int nextZone = (currentZone + 1) % 3;
         _setupZone(nextZone);
         playerPos = Vector2(80, 300);
         playerVelocityX = 0;
@@ -837,9 +464,9 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
         }
       }
     }
-
+    _updateFloatingTexts(dt);
     _updateExplosions(dt);
-
+    
     // ── H 道具撿取 ────────────────────────────────────────
     for (var hw in List.from(heavyWeapons)) {
       if (!hw.collected) {
@@ -855,6 +482,26 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
         }
       }
     }
+    // ── 戰利品撿取 ────────────────────────────────────────
+    for (var loot in List.from(loots)) {
+      final dx = (playerPos.x + playerWidth / 2) - loot.position.x;
+      final dy = (playerPos.y + playerHeight / 2) - loot.position.y;
+      if (dx * dx + dy * dy < 30 * 30) {
+        score = (score + loot.value).toInt();
+        scoreNotifier.value = score;
+        _playSfx('audio/soundEffect/pickup.mp3');
+
+        // --- 新增：建立浮動文字 ---
+        _floatingTexts.add(FloatingText(
+          text: loot.value >= 0 ? '+${loot.value.toInt()}' : '${loot.value.toInt()}',
+          position: Vector2(loot.position.x, loot.position.y - 20), // 在物體上方一點顯示
+          color: loot.value >= 0 ? Colors.yellow : Colors.red,
+        ));
+        // -----------------------
+
+        loots.remove(loot);
+      }
+    }
 
     // ── 一般敵人 ─────────────────────────────────────────
     for (var enemy in List.from(enemies)) {
@@ -864,9 +511,24 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
       for (var bullet in List.from(bullets)) {
         if (bullet.isPlayerBullet &&
             (enemy.position - bullet.position).length < 22) {
-          enemy.isDead = true;
           bullets.remove(bullet);
-          score += 100;
+          // Boss 有血量機制，普通敵人則直接死亡
+          bool died = false;
+          if (enemy is Boss) {
+            (enemy as Boss).health--;
+            if (enemy.health <= 0) {
+              enemy.isDead = true;
+              died = true;
+            }
+            score += 50;
+          } else {
+            enemy.isDead = true;
+            died = true;
+            score += 100;
+          }
+          if (died) {
+            loots.add(Loot.spawnAt(enemy.position));
+          }
           scoreNotifier.value = score;
           break;
         }
@@ -874,22 +536,34 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
 
       // 敵人射擊：瞄準玩家中心（含 y 分量，平台敵人也能打到地面玩家）
       if (enemy.shootTimer > 2.5) {
-        final double targetX = playerPos.x + playerWidth / 2;
-        final double targetY = playerPos.y + playerHeight / 2;
-        final double dx = targetX - enemy.position.x;
-        final double dy = targetY - enemy.position.y;
-        final double len = math.sqrt(dx * dx + dy * dy);
-        const double spd = 220.0;
-        final double vx = len < 1 ? spd : spd * dx / len;
-        final double vy = len < 1 ? 0 : spd * dy / len;
-        bullets.add(
-          Bullet(
-            position: Vector2(enemy.position.x, enemy.position.y),
-            velocity: Vector2(vx, vy),
-            isPlayerBullet: false,
-          ),
-        );
-        enemy.shootTimer = 0;
+        // Boss 有特殊攻擊方式，由 getBossBullets 處理
+        if (enemy is Boss) {
+          // Boss 會在 getBossBullets 中以不同方式射擊
+        } else {
+          // 普通敵人才用這個簡單射擊
+          final double targetX = playerPos.x + playerWidth / 2;
+          final double targetY = playerPos.y + playerHeight / 2;
+          final double dx = targetX - enemy.position.x;
+          final double dy = targetY - enemy.position.y;
+          final double len = math.sqrt(dx * dx + dy * dy);
+          const double spd = 220.0;
+          final double vx = len < 1 ? spd : spd * dx / len;
+          final double vy = len < 1 ? 0 : spd * dy / len;
+          bullets.add(
+            Bullet(
+              position: Vector2(enemy.position.x, enemy.position.y),
+              velocity: Vector2(vx, vy),
+              isPlayerBullet: false,
+            ),
+          );
+          enemy.shootTimer = 0;
+        }
+      }
+
+      // Boss 特殊攻擊
+      if (enemy is Boss) {
+        final bossBullets = (enemy as Boss).getBossBullets(dt, playerPos.x + playerWidth / 2);
+        bullets.addAll(bossBullets);
       }
 
       // 碰撞玩家
@@ -898,6 +572,13 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
       }
     }
     enemies.removeWhere((e) => e.isDead);
+
+    // 若為 boss 區 (zone 3) 且魔王被擊倒，標記勝利
+    if (currentZone == 2 && enemies.isEmpty && !gameVictory) {
+      gameVictory = true;
+      // 播放通關音效
+      _playSfx('audio/soundEffect/missioncomplete.mp3');
+    }
 
     // ── 坦克車 ───────────────────────────────────────────
     for (var tank in List.from(tanks)) {
@@ -914,6 +595,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
             tank.hitFlashTimer = 0.1;
             if (tank.hp <= 0) {
               tank.isDead = true;
+              loots.add(Loot.spawnAt(tank.position));
               explosions.add(
                 Explosion(
                   position: Vector2(tank.position.x, tank.position.y),
@@ -971,6 +653,16 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
     _updatePendingPlayerBullets(dt);
   }
 
+  void _updateFloatingTexts(double dt) {
+    for (int i = _floatingTexts.length - 1; i >= 0; i--) {
+      final ft = _floatingTexts[i];
+      ft.timer -= dt;
+      ft.position.y -= 20 * dt; 
+      if (ft.timer <= 0) {
+        _floatingTexts.removeAt(i);
+      }
+    }
+  }
   void _updateExplosions(double dt) {
     for (var ex in List.from(explosions)) {
       ex.update(dt);
@@ -987,12 +679,28 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
     );
     _playSfx('audio/soundEffect/bomb.wav');
 
-    // 炸一般敵人
+    // 炸一般敵人與 Boss
     for (var enemy in List.from(enemies)) {
       if ((enemy.position - grenade.position).length <
           grenade.explosionRadius) {
-        enemy.isDead = true;
-        score += 100;
+        // Boss 有血量機制：手榴彈傷害 10
+        bool died = false;
+        if (enemy is Boss) {
+          (enemy as Boss).health -= 10;
+          if (enemy.health <= 0) {
+            enemy.isDead = true;
+            died = true;
+          }
+          score += 50;
+        } else {
+          // 普通敵人直接死亡
+          enemy.isDead = true;
+          died = true;
+          score += 100;
+        }
+        if (died) {
+          loots.add(Loot.spawnAt(enemy.position));
+        }
         scoreNotifier.value = score;
       }
     }
@@ -1008,6 +716,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
           tank.hitFlashTimer = 0.2;
           if (tank.grenadeHits >= Tank.grenadeHitsToKill) {
             tank.isDead = true;
+            loots.add(Loot.spawnAt(tank.position));
             explosions.add(
               Explosion(
                 position: Vector2(tank.position.x, tank.position.y),
@@ -1149,6 +858,14 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
     KeyEvent event,
     Set<LogicalKeyboardKey> keysPressed,
   ) {
+    // 先檢查是否按 Esc 返回主菜單（可在死亡或勝利時使用）
+    if (event is KeyDownEvent && (gameOver || gameVictory || _isDying)) {
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        onReturnToMenu?.call();
+        return KeyEventResult.handled;
+      }
+    }
+    
     if (_isDying || gameOver || _zoneTransiting) return KeyEventResult.handled;
     if (event is KeyDownEvent) {
       if (event.logicalKey == LogicalKeyboardKey.keyA)
@@ -1177,6 +894,14 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
     return KeyEventResult.handled;
   }
 
+    @override
+    void onTapDown(info) {
+      // 任何點擊時直接返回菜單
+      if (gameOver || gameVictory || _isDying) {
+        onReturnToMenu?.call();
+      }
+    }
+
 @override
   void render(Canvas canvas) {
     // 1. 計算縮放比例：將實際螢幕尺寸 (size.x, size.y) 除以你的遊戲邏輯尺寸 (800, 600)
@@ -1197,6 +922,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
         Rect.fromLTWH(0, 0, gameWidth, gameHeight),
         Paint()..color = Colors.black,
       );
+      int nextZone = (currentZone + 1) % 3;
       TextPaint(
         style: const TextStyle(
           color: Colors.white,
@@ -1205,7 +931,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
         ),
       ).render(
         canvas,
-        currentZone == 0 ? 'Zone 2 ▶' : 'Zone 1 ▶',
+        'Zone ${nextZone + 1} ▶',
         Vector2(gameWidth / 2 - 70, gameHeight / 2 - 20),
       );
       canvas.restore(); // 過場時也要記得 restore
@@ -1214,7 +940,11 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
 
     // ── 背景圖像 ────────────────────────────────────────────
     try {
-      final bgImage = currentZone == 0 ? zone1Background : zone2Background;
+      final ui.Image bgImage = currentZone == 0
+          ? zone1Background
+          : currentZone == 1
+              ? zone2Background
+              : zone3Background;
       canvas.drawImageRect(
         bgImage,
         Rect.fromLTWH(
@@ -1278,22 +1008,25 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
         Rect.fromLTWH(playerPos.x, renderY, playerWidth, renderH),
         Paint()..color = playerColor,
       );
-      final gunPaint = Paint()..color = Colors.grey;
+      final gunPaint = Paint()
+        ..color = Colors.grey.shade800
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round;
       double gunY = renderY + renderH / 2;
-      if (isAiming) {
+      if (isAiming) {//向上瞄準
         double gx = isFacingRight ? playerPos.x + playerWidth : playerPos.x;
-        canvas.drawLine(Offset(gx, gunY - 5), Offset(gx, gunY - 20), gunPaint);
+        canvas.drawLine(Offset(gx, gunY - 8), Offset(gx, gunY - 25), gunPaint);
       } else {
         if (isFacingRight) {
           canvas.drawLine(
             Offset(playerPos.x + playerWidth, gunY),
-            Offset(playerPos.x + playerWidth + 10, gunY),
+            Offset(playerPos.x + playerWidth + 15, gunY),
             gunPaint,
           );
         } else {
           canvas.drawLine(
             Offset(playerPos.x, gunY),
-            Offset(playerPos.x - 10, gunY),
+            Offset(playerPos.x - 15, gunY),
             gunPaint,
           );
         }
@@ -1307,6 +1040,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
     for (var b in bullets) b.render(canvas);
     for (var g in grenades) g.render(canvas);
     for (var ex in explosions) ex.render(canvas);
+    for (var lt in loots) lt.render(canvas);
 
     // UI 標示
     TextPaint(
@@ -1355,6 +1089,93 @@ class MetalSlugGame extends FlameGame with KeyboardEvents {
         canvas,
         'Final Score: $score',
         Vector2(gameWidth / 2 - 80, gameHeight / 2 + 20),
+      );
+      // Draw return button
+      // 按鈕背景漸變效果
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(_returnButtonRect, const Radius.circular(15)),
+        Paint()
+          ..color = const Color(0xFF2196F3)
+          ..style = PaintingStyle.fill,
+      );
+      // 按鈕邊框
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(_returnButtonRect, const Radius.circular(15)),
+        Paint()
+          ..color = Colors.white
+          ..strokeWidth = 3
+          ..style = PaintingStyle.stroke,
+      );
+      TextPaint(
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ).render(
+        canvas,
+        '返回主選單',
+        Vector2(_returnButtonRect.left + 15, _returnButtonRect.top + 8),
+      );
+    }
+    // 3. 【放置在這裡】 浮動分數（保證在所有遊戲物件上方）
+    // ---------------------------------------------------------
+    for (var ft in _floatingTexts) {
+      // 根據剩餘時間計算透明度（淡出效果）
+      final double opacity = (ft.timer / 2.0).clamp(0.0, 1.0);
+      
+      TextPaint(
+        style: TextStyle(
+          color: ft.color.withOpacity(opacity),
+          fontSize: 18, // 稍微大一點比較清楚
+          fontWeight: FontWeight.bold,
+          shadows: [
+            Shadow(
+              blurRadius: 3,
+              color: Colors.black.withOpacity(opacity),
+              offset: const Offset(1, 1),
+            )
+          ],
+        ),
+      ).render(canvas, ft.text, ft.position);
+    }
+    // 勝利顯示（若有）
+    if (gameVictory) {
+      TextPaint(
+        style: const TextStyle(
+          color: Colors.yellow,
+          fontSize: 60,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 4,
+        ),
+      ).render(
+        canvas,
+        'MISSION COMPLETE',
+        Vector2(gameWidth / 2 - 250, gameHeight / 2 - 30),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(_returnButtonRect, const Radius.circular(15)),
+        Paint()
+          ..color = const Color(0xFF2196F3)
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(_returnButtonRect, const Radius.circular(15)),
+        Paint()
+          ..color = Colors.white
+          ..strokeWidth = 3
+          ..style = PaintingStyle.stroke,
+      );
+      TextPaint(
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ).render(
+        canvas,
+        '返回主選單',
+        Vector2(_returnButtonRect.left + 15, _returnButtonRect.top + 8),
       );
     }
 

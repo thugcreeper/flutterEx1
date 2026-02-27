@@ -171,7 +171,7 @@ class _MainMenuState extends State<MainMenu> {
                               ],
                             ),
                             child: Text(
-                              '在一個被敵人占領的城市中，你作為一名勇敢的士兵，必須穿越重重危險，消滅所有敵人，拯救被俘虜的同伴，並完成每一關的任務。準備好迎接挑戰了嗎？',
+                              '在一個被敵人占領的城市中，你作為一名勇敢的士兵，必須穿越重重危險，消滅所有敵人，拯救被俘虜的同伴，並完成每一關的任務。準備好迎接挑戰了嗎？注意你只能失誤3次，碰到小兵、坦克、魔王都會扣血',
                               textAlign: TextAlign.center,
                               style: Theme.of(context)
                                   .textTheme
@@ -225,29 +225,33 @@ class _MainMenuState extends State<MainMenu> {
                               const SizedBox(width: 20),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Center(
-                                      child: Text(
-                                        '遊戲說明',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .headlineSmall
-                                            ?.copyWith(
-                                              color: Colors.green,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Center(
+                                        child: Text(
+                                          '遊戲說明',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .headlineSmall
+                                              ?.copyWith(
+                                                color: Colors.green,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    _buildTipRow('🔴 紅色', '玩家（你）'),
-                                    _buildTipRow('🔵 藍色方塊', '敵人'),
-                                    _buildTipRow('💛 黃色圓點', '你的子彈'),
-                                    _buildTipRow('💎 青色圓點', '敵人的子彈'),
-                                    _buildTipRow('💣 黑色圓形', '手榴彈（會爆炸）'),
-                                    const SizedBox(height: 12),
-                                  ],
-                                ),
+                                      const SizedBox(height: 12),
+                                      _buildTipRow('🔵 藍色方塊', '敵人，碰到會掉血'),
+                                      _buildTipRow('💛 黃色圓點', '你的子彈，擊中敵人造成傷害'),
+                                      _buildTipRow('💎 青色圓點', '敵人的子彈，碰到玩家會掉血'),
+                                      _buildTipRow('💣 黑色圓形', '手榴彈（會爆炸，擊中敵人）'),
+                                      _buildTipRow('H圖案', '機槍，撿起後可持續射擊'),
+                                      _buildTipRow('💠 青色菱形', '戰利品：鑽石，+100 分數'),
+                                      _buildTipRow('🍎 紅色水果', '戰利品：水果，+20 分數'),
+                                      _buildTipRow('🐷 粉紅小豬', '戰利品：豬，+50 分數'),
+                                      _buildTipRow('💩 棕色螺旋', '戰利品：便便，-10 分數'),
+                                      const SizedBox(height: 12),
+                                    ],
+                                  ),
                               ),
                             ],
                           ),
@@ -295,6 +299,7 @@ class _MainMenuState extends State<MainMenu> {
               key,
               textAlign: TextAlign.center,
               style: const TextStyle(
+                fontSize:20,
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
@@ -302,7 +307,7 @@ class _MainMenuState extends State<MainMenu> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(action, style: const TextStyle(color: Colors.white)),
+            child: Text(action, style: const TextStyle(fontSize:20,color: Colors.white)),
           ),
         ],
       ),
@@ -316,14 +321,14 @@ class _MainMenuState extends State<MainMenu> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 56,
+            width: 200,
             child: Center(
-              child: Text(icon, style: const TextStyle(fontSize: 18)),
+              child: Text(icon, style: const TextStyle(fontSize: 20,color:Colors.white)),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(text, style: const TextStyle(color: Colors.white)),
+            child: Text(text, style: const TextStyle(fontSize:20,color: Colors.white)),
           ),
         ],
       ),
@@ -420,7 +425,9 @@ class _GameScreenState extends State<GameScreen> {
         ),
         body: Stack(
           children: [
-            GameWidget(game: _game),
+            GameWidget(
+              game: _game..onReturnToMenu = () => Navigator.of(context).pop(),
+            ),
             // ── HUD：左上角三列分開顯示 ─────────────────────
             Positioned(
               top: 10,
