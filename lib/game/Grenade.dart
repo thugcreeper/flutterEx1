@@ -4,14 +4,15 @@
 import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
+
 class Grenade {
   Vector2 position;
   Vector2 velocity;
-  double gravity = 500;
-  double radius = 6;
-  double explosionRadius = 80;
+  double gravity = 500.0;
+  double radius = 6.0;
+  double explosionRadius = 80.0;
   double lifetime = 5.0;
-  double currentTime = 0;
+  double currentTime = 0.0;
 
   Grenade({required this.position, required this.velocity});
 

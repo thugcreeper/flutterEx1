@@ -104,168 +104,245 @@ class _CharacterSelectScreenState extends State<CharacterSelectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    final crossAxisCount = isLandscape ? 4 : 2;
+    final progress = (_timeRemaining / 30).clamp(0.0, 1.0);
+    final timerColor = _timeRemaining <= 10
+        ? const Color(0xFFD32F2F)
+        : const Color(0xFF1976D2);
+
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.grey[900]!, Colors.grey[800]!],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Column(
-          children: [
-            // 標題和倒數計時
-            Padding(
-              padding: const EdgeInsets.all(20),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset('assets/background/mainBg.gif', fit: BoxFit.cover),
+          Container(color: Colors.black.withOpacity(0.72)),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               child: Column(
                 children: [
-                  Text(
-                    '選擇你的角色',
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.42),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '選擇角色',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: timerColor,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '$_timeRemaining 秒',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(99),
+                          child: LinearProgressIndicator(
+                            minHeight: 7,
+                            value: progress,
+                            backgroundColor: Colors.white24,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _timeRemaining <= 10
+                                  ? const Color(0xFFFF8A80)
+                                  : const Color(0xFF42A5F5),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _timeRemaining <= 10 ? Colors.red : Colors.blue,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '剩餘時間: $_timeRemaining 秒',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        const spacing = 12.0;
+                        final rows = (characters.length / crossAxisCount)
+                            .ceil();
+                        final tileHeight =
+                            (constraints.maxHeight - (rows - 1) * spacing) /
+                            rows;
+
+                        return GridView.builder(
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: EdgeInsets.zero,
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                crossAxisSpacing: spacing,
+                                mainAxisSpacing: spacing,
+                                mainAxisExtent: tileHeight,
+                              ),
+                          itemCount: characters.length,
+                          itemBuilder: (context, index) {
+                            final character = characters[index];
+                            final isSelected = _selectedCharacterIndex == index;
+
+                            return GestureDetector(
+                              onTap: () {
+                                if (_selectedCharacterIndex == null) {
+                                  _onCharacterSelected(index);
+                                }
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                transform: Matrix4.identity()
+                                  ..scale(isSelected ? 1.01 : 1.0),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.42),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? Colors.yellowAccent
+                                        : character.color.withOpacity(0.9),
+                                    width: isSelected ? 2.8 : 1.6,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          (isSelected
+                                                  ? character.color
+                                                  : Colors.black)
+                                              .withOpacity(
+                                                isSelected ? 0.45 : 0.30,
+                                              ),
+                                      blurRadius: isSelected ? 14 : 8,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(9),
+                                        child: Image.asset(
+                                          character.imagePath,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                      Positioned.fill(
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(
+                                              9,
+                                            ),
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topCenter,
+                                              end: Alignment.bottomCenter,
+                                              colors: [
+                                                Colors.black.withOpacity(0.08),
+                                                Colors.transparent,
+                                                Colors.black.withOpacity(0.6),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        left: 6,
+                                        right: 6,
+                                        bottom: 6,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withOpacity(
+                                              0.58,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              7,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            character.name.toUpperCase(),
+                                            textAlign: TextAlign.center,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.7,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        Positioned(
+                                          top: 6,
+                                          right: 6,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.yellowAccent,
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                            ),
+                                            child: const Text(
+                                              '已選擇',
+                                              style: TextStyle(
+                                                color: Colors.black,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
                     ),
                   ),
                 ],
               ),
             ),
-            // 角色選擇網格
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(20),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: 0.75,
-                ),
-                itemCount: characters.length,
-                itemBuilder: (context, index) {
-                  final character = characters[index];
-                  final isSelected = _selectedCharacterIndex == index;
-
-                  return GestureDetector(
-                    onTap: () {
-                      if (_selectedCharacterIndex == null) {
-                        _onCharacterSelected(index);
-                      }
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? Color.fromRGBO(
-                                character.color.red,
-                                character.color.green,
-                                character.color.blue,
-                                0.8,
-                              )
-                            : Colors.black54,
-                        border: Border.all(
-                          color: isSelected ? Colors.yellow : character.color,
-                          width: isSelected ? 4 : 2,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: Color.fromRGBO(
-                                    character.color.red,
-                                    character.color.green,
-                                    character.color.blue,
-                                    0.5,
-                                  ),
-                                  blurRadius: 20,
-                                  spreadRadius: 5,
-                                ),
-                              ]
-                            : [],
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // 使用圖片顯示角色
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.asset(
-                              character.imagePath,
-                              width: 250,
-                              height: 250,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          const SizedBox(height: 15),
-                          Text(
-                            character.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                          ),
-                          if (isSelected)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.yellow,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  '已選擇',
-                                  style: TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            // 底部提示
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Text(
-                '點擊選擇角色，或等待倒數計時結束自動選擇第一個角色',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

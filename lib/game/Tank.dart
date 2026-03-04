@@ -6,21 +6,22 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'Bullet.dart';
 import 'Platform.dart';
+
 class Tank {
   Vector2 position;
-  double width = 70;
-  double height = 40;
-  double moveSpeed = 30;
-  double direction = -1; // 預設向左（面向玩家）
-  double shootTimer = 0;
+  double width = 70.0;
+  double height = 40.0;
+  double moveSpeed = 30.0;
+  double direction = -1.0; // 預設向左（面向玩家）
+  double shootTimer = 0.0;
   double shootInterval = 6.0;
   bool isDead = false;
   int hp = 30;
   int grenadeHits = 0;
   static const int grenadeHitsToKill = 2;
-  double velocityY = 0;
+  double velocityY = 0.0;
   static const double _gravity = 600;
-  double hitFlashTimer = 0;
+  double hitFlashTimer = 0.0;
 
   // 延遲發射佇列：每筆為 (剩餘等待時間, 方向)
   final List<List<double>> _pendingShots = []; // [remainingDelay, dir]
@@ -53,7 +54,7 @@ class Tank {
           prevBottom <= p.top + 2 &&
           nextBottom >= p.top) {
         nextY = p.top - height / 2;
-        velocityY = 0;
+        velocityY = 0.0;
         break;
       }
     }
@@ -70,10 +71,10 @@ class Tank {
       if (xOvlp && onTop) {
         if (position.x - width / 2 < p.left) {
           position.x = p.left + width / 2;
-          direction = 1;
+          direction = 1.0;
         } else if (position.x + width / 2 > p.right) {
           position.x = p.right - width / 2;
-          direction = -1;
+          direction = -1.0;
         }
         break;
       }
@@ -87,7 +88,7 @@ class Tank {
     // 主計時器：到時間就排入 3 顆延遲砲彈
     shootTimer += dt;
     if (shootTimer >= shootInterval) {
-      shootTimer = 0;
+      shootTimer = 0.0;
       double dir = (playerX < position.x) ? -1.0 : 1.0;
       // 3 顆：延遲 0、0.1、0.2 秒
       _pendingShots.add([0.0, dir]);

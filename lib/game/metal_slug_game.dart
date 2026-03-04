@@ -13,9 +13,8 @@ import 'Platform.dart';
 import 'Tank.dart';
 import 'loot.dart';
 import 'Boss.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:flutter/services.dart' show rootBundle;
-
+import '../services/audio_manager.dart';
 
 Future<ui.Image> loadUiImage(String assetPath) async {
   final data = await rootBundle.load('assets/$assetPath');
@@ -24,27 +23,13 @@ Future<ui.Image> loadUiImage(String assetPath) async {
   final frame = await codec.getNextFrame();
   return frame.image;
 }
+
 // ────────────────────────────────────────────────────────────
 // 音效
 // ────────────────────────────────────────────────────────────
 Future<void> _playSfx(String assetPath) async {
-  try {
-    final player = AudioPlayer();
-    print('[SFX] 正在加載: $assetPath');
-    await player.setAudioSource(AudioSource.asset(assetPath));
-    await player.play();
-    print('[SFX] 播放開始: $assetPath');
-    player.playerStateStream.listen((state) {
-      if (state.processingState == ProcessingState.completed) {
-        print('[SFX] 播放完成，釋放資源: $assetPath');
-        player.dispose();
-      }
-    });
-  } catch (e) {
-    print('[ERROR] 音效播放失敗 ($assetPath): $e');
-  }
+  await AudioManager().playSfx(assetPath);
 }
-
 
 //顯示戰利品得分的浮動文字
 class FloatingText {
@@ -60,7 +45,6 @@ class FloatingText {
     this.timer = 2.0, // 顯示2秒
   });
 }
-
 
 // ────────────────────────────────────────────────────────────
 // MetalSlugGame
@@ -161,6 +145,8 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
   // ── 射擊冷卻 ──────────────────────────────────────────────
   double shootCooldownTimer = 0.0;
   final double shootCooldown = 0.2; // 0.2 秒射一次
+  double _shootSfxCooldownTimer = 0.0;
+  static const double _shootSfxCooldown = 0.08;
 
   // 子彈無限發（手槍）/ 機槍彈藥
   bool hasMachineGun = false;
@@ -181,26 +167,28 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
   Future<void> onLoad() async {
     super.onLoad();
     // 初始化回主選單按鈕（以遊戲座標表示）
-    _returnButtonRect = Rect.fromLTWH(gameWidth / 2 - 100, gameHeight / 2 + 60, 200, 40);
+    _returnButtonRect = Rect.fromLTWH(
+      gameWidth / 2 - 100,
+      gameHeight / 2 + 60,
+      200,
+      40,
+    );
     playerPos = Vector2(100, 300);
 
-    
-    
     try {
-        zone1Background = await loadUiImage('background/zone1.jpg');
-        zone2Background = await loadUiImage('background/zone2.jpg');
-        zone3Background = await loadUiImage('background/zone3.jpg');
+      zone1Background = await loadUiImage('background/zone1.jpg');
+      zone2Background = await loadUiImage('background/zone2.jpg');
+      zone3Background = await loadUiImage('background/zone3.jpg');
       print('[Background] 背景圖像已加載');
     } catch (e) {
       print('[ERROR] 背景圖像加載失敗: $e');
     }
-    
 
     _setupZone(0);
     invulnerableTimer = 1.5;
     // 延後播放，確保 audio context 已就緒
     Future.delayed(const Duration(milliseconds: 1000), () {
-      _playSfx('audio/soundEffect/missonStart.mp3');
+      _playSfx('audio/soundEffect/missionStart.wav');
     });
   }
 
@@ -288,7 +276,10 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
       platforms = [groundPlatform];
       // 置入一隻 Boss
       enemies = [
-        Boss(position: Vector2(gameWidth / 2, groundPlatform.top - 120), health: 120),
+        Boss(
+          position: Vector2(gameWidth / 2, groundPlatform.top - 120),
+          health: 120,
+        ),
       ];
     }
 
@@ -314,6 +305,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     livesNotifier.value = lives;
     if (lives <= 0) {
       gameOver = true;
+      AudioManager().stop();
       return;
     }
     _deathX = playerPos.x;
@@ -328,8 +320,8 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
   void _respawn() {
     _isDying = false;
     playerPos = Vector2(
-      _deathX.clamp(playerWidth, gameWidth - playerWidth),
-      -60,
+      _deathX.clamp(playerWidth, gameWidth - playerWidth).toDouble(),
+      -60.0,
     );
     playerVelocityX = 0;
     playerVelocityY = 0;
@@ -357,7 +349,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
         playerVelocityX = 0;
         playerVelocityY = 0;
         invulnerableTimer = 1.5;
-        _playSfx('audio/soundEffect/missionStart.mp3');
+        _playSfx('audio/soundEffect/missionStart.wav');
       }
       return;
     }
@@ -419,7 +411,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     }
 
     // ── 手榴彈 ───────────────────────────────────────────
-    for (var grenade in List.from(grenades)) {
+    for (final grenade in List<Grenade>.from(grenades)) {
       grenade.update(dt);
       bool shouldExplode = false;
       for (var p in platforms) {
@@ -443,7 +435,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     }
 
     // ── 子彈（移動 + 邊界 + 玩家碰撞）──────────────────
-    for (var bullet in List.from(bullets)) {
+    for (final bullet in List<Bullet>.from(bullets)) {
       bullet.update(dt);
       if (bullet.position.x < 0 ||
           bullet.position.x > gameWidth ||
@@ -466,9 +458,9 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     }
     _updateFloatingTexts(dt);
     _updateExplosions(dt);
-    
+
     // ── H 道具撿取 ────────────────────────────────────────
-    for (var hw in List.from(heavyWeapons)) {
+    for (final hw in List<HeavyWeapon>.from(heavyWeapons)) {
       if (!hw.collected) {
         final dx = (playerPos.x + playerWidth / 2) - hw.position.x;
         final dy = (playerPos.y + playerHeight / 2) - hw.position.y;
@@ -476,27 +468,34 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
           hw.collected = true;
           hasMachineGun = true;
           //撿起H後撥放機槍音效
-          _playSfx('audio/soundEffect/heavymachinegun.mp3');
+          _playSfx('audio/soundEffect/heavymachinegun.wav');
           machineGunAmmo = machineGunAmmoPerPickup;
           ammoNotifier.value = '$machineGunAmmo';
         }
       }
     }
     // ── 戰利品撿取 ────────────────────────────────────────
-    for (var loot in List.from(loots)) {
+    for (final loot in List<Loot>.from(loots)) {
       final dx = (playerPos.x + playerWidth / 2) - loot.position.x;
       final dy = (playerPos.y + playerHeight / 2) - loot.position.y;
       if (dx * dx + dy * dy < 30 * 30) {
         score = (score + loot.value).toInt();
         scoreNotifier.value = score;
-        _playSfx('audio/soundEffect/pickup.mp3');
+        _playSfx('audio/soundEffect/pickup.wav');
 
         // --- 新增：建立浮動文字 ---
-        _floatingTexts.add(FloatingText(
-          text: loot.value >= 0 ? '+${loot.value.toInt()}' : '${loot.value.toInt()}',
-          position: Vector2(loot.position.x, loot.position.y - 20), // 在物體上方一點顯示
-          color: loot.value >= 0 ? Colors.yellow : Colors.red,
-        ));
+        _floatingTexts.add(
+          FloatingText(
+            text: loot.value >= 0
+                ? '+${loot.value.toInt()}'
+                : '${loot.value.toInt()}',
+            position: Vector2(
+              loot.position.x,
+              loot.position.y - 20,
+            ), // 在物體上方一點顯示
+            color: loot.value >= 0 ? Colors.yellow : Colors.red,
+          ),
+        );
         // -----------------------
 
         loots.remove(loot);
@@ -504,11 +503,11 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     }
 
     // ── 一般敵人 ─────────────────────────────────────────
-    for (var enemy in List.from(enemies)) {
+    for (final enemy in List<Enemy>.from(enemies)) {
       enemy.update(dt, platforms);
 
       // 子彈命中
-      for (var bullet in List.from(bullets)) {
+      for (final bullet in List<Bullet>.from(bullets)) {
         if (bullet.isPlayerBullet &&
             (enemy.position - bullet.position).length < 22) {
           bullets.remove(bullet);
@@ -535,34 +534,42 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
       }
 
       // 敵人射擊：瞄準玩家中心（含 y 分量，平台敵人也能打到地面玩家）
-      if (enemy.shootTimer > 2.5) {
-        // Boss 有特殊攻擊方式，由 getBossBullets 處理
-        if (enemy is Boss) {
-          // Boss 會在 getBossBullets 中以不同方式射擊
-        } else {
-          // 普通敵人才用這個簡單射擊
-          final double targetX = playerPos.x + playerWidth / 2;
-          final double targetY = playerPos.y + playerHeight / 2;
-          final double dx = targetX - enemy.position.x;
-          final double dy = targetY - enemy.position.y;
-          final double len = math.sqrt(dx * dx + dy * dy);
-          const double spd = 220.0;
-          final double vx = len < 1 ? spd : spd * dx / len;
-          final double vy = len < 1 ? 0 : spd * dy / len;
-          bullets.add(
-            Bullet(
-              position: Vector2(enemy.position.x, enemy.position.y),
-              velocity: Vector2(vx, vy),
-              isPlayerBullet: false,
-            ),
-          );
-          enemy.shootTimer = 0;
+      try {
+        if (enemy.shootTimer > 2.5) {
+          // Boss 有特殊攻擊方式，由 getBossBullets 處理
+          if (enemy is Boss) {
+            // Boss 會在 getBossBullets 中以不同方式射擊
+          } else {
+            // 普通敵人才用這個簡單射擊
+            final double targetX = playerPos.x + playerWidth / 2;
+            final double targetY = playerPos.y + playerHeight / 2;
+            final double dx = targetX - enemy.position.x;
+            final double dy = targetY - enemy.position.y;
+            final double len = math.sqrt(dx * dx + dy * dy);
+            const double spd = 220.0;
+            final double vx = len < 1 ? spd : spd * dx / len;
+            final double vy = len < 1 ? 0.0 : spd * dy / len;
+            bullets.add(
+              Bullet(
+                position: Vector2(enemy.position.x, enemy.position.y),
+                velocity: Vector2(vx, vy),
+                isPlayerBullet: false,
+              ),
+            );
+            enemy.shootTimer = 0.0;
+          }
         }
+      } catch (e) {
+        debugPrint('[ERROR] enemy shoot logic failed: $e');
+        enemy.shootTimer = 0.0;
       }
 
       // Boss 特殊攻擊
       if (enemy is Boss) {
-        final bossBullets = (enemy as Boss).getBossBullets(dt, playerPos.x + playerWidth / 2);
+        final bossBullets = (enemy as Boss).getBossBullets(
+          dt,
+          playerPos.x + playerWidth / 2,
+        );
         bullets.addAll(bossBullets);
       }
 
@@ -577,15 +584,15 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     if (currentZone == 2 && enemies.isEmpty && !gameVictory) {
       gameVictory = true;
       // 播放通關音效
-      _playSfx('audio/soundEffect/missioncomplete.mp3');
+      _playSfx('audio/soundEffect/missionComplete.wav');
     }
 
     // ── 坦克車 ───────────────────────────────────────────
-    for (var tank in List.from(tanks)) {
+    for (final tank in List<Tank>.from(tanks)) {
       tank.update(dt, platforms);
 
       // 子彈命中坦克（需 10 發）
-      for (var bullet in List.from(bullets)) {
+      for (final bullet in List<Bullet>.from(bullets)) {
         if (bullet.isPlayerBullet) {
           final dx = bullet.position.x - tank.position.x;
           final dy = bullet.position.y - tank.position.y;
@@ -649,6 +656,13 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
       );
     }
 
+    if (_shootSfxCooldownTimer > 0) {
+      _shootSfxCooldownTimer = (_shootSfxCooldownTimer - dt).clamp(
+        0.0,
+        double.infinity,
+      );
+    }
+
     // 機槍延遲子彈
     _updatePendingPlayerBullets(dt);
   }
@@ -657,14 +671,15 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     for (int i = _floatingTexts.length - 1; i >= 0; i--) {
       final ft = _floatingTexts[i];
       ft.timer -= dt;
-      ft.position.y -= 20 * dt; 
+      ft.position.y -= 20 * dt;
       if (ft.timer <= 0) {
         _floatingTexts.removeAt(i);
       }
     }
   }
+
   void _updateExplosions(double dt) {
-    for (var ex in List.from(explosions)) {
+    for (final ex in List<Explosion>.from(explosions)) {
       ex.update(dt);
       if (ex.isFinished) explosions.remove(ex);
     }
@@ -680,7 +695,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     _playSfx('audio/soundEffect/bomb.wav');
 
     // 炸一般敵人與 Boss
-    for (var enemy in List.from(enemies)) {
+    for (final enemy in List<Enemy>.from(enemies)) {
       if ((enemy.position - grenade.position).length <
           grenade.explosionRadius) {
         // Boss 有血量機制：手榴彈傷害 10
@@ -706,7 +721,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     }
 
     // 炸坦克（需 2 顆手榴彈，用矩形範圍偵測）
-    for (var tank in List.from(tanks)) {
+    for (final tank in List<Tank>.from(tanks)) {
       if (!tank.isDead) {
         final dx = (tank.position.x - grenade.position.x).abs();
         final dy = (tank.position.y - grenade.position.y).abs();
@@ -749,7 +764,10 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     // 機槍有冷卻限制，手槍無限制
     if (hasMachineGun && shootCooldownTimer > 0) return;
 
-    _playSfx('audio/soundEffect/shoot.wav');
+    if (_shootSfxCooldownTimer <= 0) {
+      _playSfx('audio/soundEffect/shoot.wav');
+      _shootSfxCooldownTimer = _shootSfxCooldown;
+    }
 
     if (hasMachineGun && machineGunAmmo > 0) {
       // 機槍：一次排 5 顆，每顆間隔 0.06 秒，設置 1 秒冷卻
@@ -865,16 +883,20 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
         return KeyEventResult.handled;
       }
     }
-    
+
     if (_isDying || gameOver || _zoneTransiting) return KeyEventResult.handled;
     if (event is KeyDownEvent) {
-      if (event.logicalKey == LogicalKeyboardKey.keyA)
+      if (event.logicalKey == LogicalKeyboardKey.keyA ||
+          event.logicalKey == LogicalKeyboardKey.arrowLeft)
         moveLeft();
-      else if (event.logicalKey == LogicalKeyboardKey.keyD)
+      else if (event.logicalKey == LogicalKeyboardKey.keyD ||
+          event.logicalKey == LogicalKeyboardKey.arrowRight)
         moveRight();
-      else if (event.logicalKey == LogicalKeyboardKey.keyW)
+      else if (event.logicalKey == LogicalKeyboardKey.keyW ||
+          event.logicalKey == LogicalKeyboardKey.arrowUp)
         isAiming = true;
-      else if (event.logicalKey == LogicalKeyboardKey.keyS)
+      else if (event.logicalKey == LogicalKeyboardKey.keyS ||
+          event.logicalKey == LogicalKeyboardKey.arrowDown)
         isCrouching = true;
       else if (event.logicalKey == LogicalKeyboardKey.keyK)
         playerJump();
@@ -884,25 +906,29 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
         throwGrenade();
     } else if (event is KeyUpEvent) {
       if (event.logicalKey == LogicalKeyboardKey.keyA ||
-          event.logicalKey == LogicalKeyboardKey.keyD)
+          event.logicalKey == LogicalKeyboardKey.keyD ||
+          event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+          event.logicalKey == LogicalKeyboardKey.arrowRight)
         stopMoving();
-      else if (event.logicalKey == LogicalKeyboardKey.keyW)
+      else if (event.logicalKey == LogicalKeyboardKey.keyW ||
+          event.logicalKey == LogicalKeyboardKey.arrowUp)
         isAiming = false;
-      else if (event.logicalKey == LogicalKeyboardKey.keyS)
+      else if (event.logicalKey == LogicalKeyboardKey.keyS ||
+          event.logicalKey == LogicalKeyboardKey.arrowDown)
         isCrouching = false;
     }
     return KeyEventResult.handled;
   }
 
-    @override
-    void onTapDown(info) {
-      // 任何點擊時直接返回菜單
-      if (gameOver || gameVictory || _isDying) {
-        onReturnToMenu?.call();
-      }
+  @override
+  void onTapDown(info) {
+    // 任何點擊時直接返回菜單
+    if (gameOver || gameVictory || _isDying) {
+      onReturnToMenu?.call();
     }
+  }
 
-@override
+  @override
   void render(Canvas canvas) {
     // 1. 計算縮放比例：將實際螢幕尺寸 (size.x, size.y) 除以你的遊戲邏輯尺寸 (800, 600)
     final double scaleX = size.x / gameWidth;
@@ -943,8 +969,8 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
       final ui.Image bgImage = currentZone == 0
           ? zone1Background
           : currentZone == 1
-              ? zone2Background
-              : zone3Background;
+          ? zone2Background
+          : zone3Background;
       canvas.drawImageRect(
         bgImage,
         Rect.fromLTWH(
@@ -1009,11 +1035,12 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
         Paint()..color = playerColor,
       );
       final gunPaint = Paint()
-        ..color = Colors.grey.shade800
-        ..strokeWidth = 4
+        ..color = Colors.black
+        ..strokeWidth = 7
         ..strokeCap = StrokeCap.round;
       double gunY = renderY + renderH / 2;
-      if (isAiming) {//向上瞄準
+      if (isAiming) {
+        //向上瞄準
         double gx = isFacingRight ? playerPos.x + playerWidth : playerPos.x;
         canvas.drawLine(Offset(gx, gunY - 8), Offset(gx, gunY - 25), gunPaint);
       } else {
@@ -1043,67 +1070,122 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     for (var lt in loots) lt.render(canvas);
 
     // UI 標示
+    final zoneRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(gameWidth - 160, 8, 150, 30),
+      const Radius.circular(8),
+    );
+    canvas.drawRRect(zoneRect, Paint()..color = Colors.black.withOpacity(0.45));
+    canvas.drawRRect(
+      zoneRect,
+      Paint()
+        ..color = Colors.white24
+        ..style = PaintingStyle.stroke,
+    );
     TextPaint(
-      style: const TextStyle(color: Colors.white70, fontSize: 13),
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+      ),
     ).render(
       canvas,
       'Zone ${currentZone + 1}  Lv.$level',
-      Vector2(gameWidth - 110, 10),
+      Vector2(gameWidth - 148, 14),
     );
 
-    TextPaint(style: const TextStyle(color: Colors.white, fontSize: 14)).render(
+    final hintBoxWidth = (gameWidth - 20).clamp(240.0, 620.0).toDouble();
+    final hintRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(10, gameHeight - 36, hintBoxWidth, 24),
+      const Radius.circular(8),
+    );
+    canvas.drawRRect(hintRect, Paint()..color = Colors.black.withOpacity(0.45));
+    TextPaint(
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+    ).render(
       canvas,
-      'A/D:Move | W:Aim | S:Crouch | K:Jump | J:Fire | L:Grenade',
-      Vector2(10, gameHeight - 25),
+      '←/→ Move  |  ↑ Aim  |  ↓ Crouch  |  K Jump  |  J Fire  |  L Grenade',
+      Vector2(16, gameHeight - 31),
     );
 
     if (_isDying) {
+      final respawnPanel = RRect.fromRectAndRadius(
+        Rect.fromLTWH(gameWidth / 2 - 100, gameHeight / 2 - 34, 200, 58),
+        const Radius.circular(12),
+      );
+      canvas.drawRRect(
+        respawnPanel,
+        Paint()..color = Colors.black.withOpacity(0.62),
+      );
       TextPaint(
         style: const TextStyle(
-          color: Colors.yellow,
+          color: Colors.amber,
           fontSize: 28,
           fontWeight: FontWeight.bold,
         ),
       ).render(
         canvas,
         'Respawning...',
-        Vector2(gameWidth / 2 - 80, gameHeight / 2 - 20),
+        Vector2(gameWidth / 2 - 86, gameHeight / 2 - 18),
       );
     }
 
     if (gameOver) {
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, gameWidth, gameHeight),
+        Paint()..color = Colors.black.withOpacity(0.62),
+      );
+      final gameOverPanel = RRect.fromRectAndRadius(
+        Rect.fromLTWH(gameWidth / 2 - 170, gameHeight / 2 - 115, 340, 170),
+        const Radius.circular(16),
+      );
+      canvas.drawRRect(gameOverPanel, Paint()..color = const Color(0xCC1B1B23));
+      canvas.drawRRect(
+        gameOverPanel,
+        Paint()
+          ..color = Colors.redAccent.withOpacity(0.75)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
+
       TextPaint(
         style: const TextStyle(
-          color: Colors.red,
-          fontSize: 48,
+          color: Colors.redAccent,
+          fontSize: 46,
           fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
         ),
       ).render(
         canvas,
         'GAME OVER',
-        Vector2(gameWidth / 2 - 120, gameHeight / 2 - 50),
+        Vector2(gameWidth / 2 - 135, gameHeight / 2 - 84),
       );
       TextPaint(
-        style: const TextStyle(color: Colors.white, fontSize: 24),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+        ),
       ).render(
         canvas,
         'Final Score: $score',
-        Vector2(gameWidth / 2 - 80, gameHeight / 2 + 20),
+        Vector2(gameWidth / 2 - 92, gameHeight / 2 - 16),
       );
-      // Draw return button
-      // 按鈕背景漸變效果
+
       canvas.drawRRect(
         RRect.fromRectAndRadius(_returnButtonRect, const Radius.circular(15)),
         Paint()
-          ..color = const Color(0xFF2196F3)
+          ..color = const Color(0xFF1E88E5)
           ..style = PaintingStyle.fill,
       );
-      // 按鈕邊框
       canvas.drawRRect(
         RRect.fromRectAndRadius(_returnButtonRect, const Radius.circular(15)),
         Paint()
           ..color = Colors.white
-          ..strokeWidth = 3
+          ..strokeWidth = 2.4
           ..style = PaintingStyle.stroke,
       );
       TextPaint(
@@ -1122,8 +1204,8 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     // ---------------------------------------------------------
     for (var ft in _floatingTexts) {
       // 根據剩餘時間計算透明度（淡出效果）
-      final double opacity = (ft.timer / 2.0).clamp(0.0, 1.0);
-      
+      final double opacity = (ft.timer / 2.0).clamp(0.0, 1.0).toDouble();
+
       TextPaint(
         style: TextStyle(
           color: ft.color.withOpacity(opacity),
@@ -1134,36 +1216,63 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
               blurRadius: 3,
               color: Colors.black.withOpacity(opacity),
               offset: const Offset(1, 1),
-            )
+            ),
           ],
         ),
       ).render(canvas, ft.text, ft.position);
     }
     // 勝利顯示（若有）
     if (gameVictory) {
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, gameWidth, gameHeight),
+        Paint()..color = Colors.black.withOpacity(0.58),
+      );
+      final victoryPanel = RRect.fromRectAndRadius(
+        Rect.fromLTWH(gameWidth / 2 - 250, gameHeight / 2 - 130, 500, 180),
+        const Radius.circular(18),
+      );
+      canvas.drawRRect(victoryPanel, Paint()..color = const Color(0xCC1A2418));
+      canvas.drawRRect(
+        victoryPanel,
+        Paint()
+          ..color = Colors.yellowAccent.withOpacity(0.78)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
       TextPaint(
         style: const TextStyle(
           color: Colors.yellow,
-          fontSize: 60,
+          fontSize: 54,
           fontWeight: FontWeight.bold,
-          letterSpacing: 4,
+          letterSpacing: 2.8,
         ),
       ).render(
         canvas,
         'MISSION COMPLETE',
-        Vector2(gameWidth / 2 - 250, gameHeight / 2 - 30),
+        Vector2(gameWidth / 2 - 228, gameHeight / 2 - 88),
+      );
+      TextPaint(
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+        ),
+      ).render(
+        canvas,
+        'Score: $score',
+        Vector2(gameWidth / 2 - 56, gameHeight / 2 - 18),
       );
       canvas.drawRRect(
         RRect.fromRectAndRadius(_returnButtonRect, const Radius.circular(15)),
         Paint()
-          ..color = const Color(0xFF2196F3)
+          ..color = const Color(0xFF1E88E5)
           ..style = PaintingStyle.fill,
       );
       canvas.drawRRect(
         RRect.fromRectAndRadius(_returnButtonRect, const Radius.circular(15)),
         Paint()
           ..color = Colors.white
-          ..strokeWidth = 3
+          ..strokeWidth = 2.4
           ..style = PaintingStyle.stroke,
       );
       TextPaint(

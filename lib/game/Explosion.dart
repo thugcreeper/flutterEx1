@@ -4,6 +4,7 @@
 import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
+
 class Explosion {
   Vector2 position;
   double maxRadius;
@@ -16,9 +17,9 @@ class Explosion {
   bool get isFinished => currentTime >= duration;
 
   void render(Canvas canvas) {
-    final t = (currentTime / duration).clamp(0.0, 1.0);
-    final r = maxRadius * t;
-    final alpha = ((1 - t) * 0.9).clamp(0.0, 0.9);
+    final double t = (currentTime / duration).clamp(0.0, 1.0).toDouble();
+    final double r = maxRadius * t;
+    final double alpha = ((1 - t) * 0.9).clamp(0.0, 0.9).toDouble();
     canvas.drawCircle(
       Offset(position.x, position.y),
       r,

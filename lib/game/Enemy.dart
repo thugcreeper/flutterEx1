@@ -8,13 +8,13 @@ import 'Platform.dart';
 
 class Enemy {
   Vector2 position; // 敵人位置
-  double width = 30; // 寬度
-  double height = 30; // 高度
-  double moveSpeed = 50; // 移動速度
-  double direction = 1; // 移動方向（1=右，-1=左）
-  double shootTimer = 0; // 射擊計時器
+  double width = 30.0; // 寬度
+  double height = 30.0; // 高度
+  double moveSpeed = 50.0; // 移動速度
+  double direction = 1.0; // 移動方向（1=右，-1=左）
+  double shootTimer = 0.0; // 射擊計時器
   bool isDead = false; // 是否死亡
-  double velocityY = 0; // 垂直速度（向下為正）
+  double velocityY = 0.0; // 垂直速度（向下為正）
   static const double _gravity = 600; // 重力加速度
 
   Enemy({required this.position});
@@ -49,7 +49,7 @@ class Enemy {
           prevBottom <= p.top + 2 &&
           nextBottom >= p.top) {
         nextY = p.top - height / 2; // 對齊平台頂
-        velocityY = 0; // 停止下落
+        velocityY = 0.0; // 停止下落
         standing = p; // 記錄站立平台
         break;
       }
@@ -64,15 +64,15 @@ class Enemy {
     if (standing != null) {
       if (position.x - width / 2 < standing.left) {
         position.x = standing.left + width / 2;
-        direction = 1; // 右移
+        direction = 1.0; // 右移
       } else if (position.x + width / 2 > standing.right) {
         position.x = standing.right - width / 2;
-        direction = -1; // 左移
+        direction = -1.0; // 左移
       }
     } else {
       // 如果不在平台上，限制邊界反轉
-      if (position.x < 15) direction = 1;
-      if (position.x > 785) direction = -1;
+      if (position.x < 15) direction = 1.0;
+      if (position.x > 785) direction = -1.0;
     }
   }
 

@@ -1,9 +1,31 @@
 import 'dart:developer';
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
 class AudioManager {
   static final AudioManager _instance = AudioManager._internal();
-  late AudioPlayer _audioPlayer;
+  AudioPlayer? _audioPlayer;
+  AudioPlayer? _sfxPlayer;
+  Future<void> _sfxLock = Future.value();
+
+  AudioPlayer get _bgmPlayer => _audioPlayer ??= AudioPlayer();
+  AudioPlayer get _sfxPlayerSafe => _sfxPlayer ??= AudioPlayer();
+
+  String _normalizeAssetPath(String assetPath) {
+    final normalized = assetPath.replaceAll('\\', '/');
+    return normalized.startsWith('assets/')
+        ? normalized.substring('assets/'.length)
+        : normalized;
+  }
+
+  List<String> _assetCandidates(String assetPath) {
+    final relativePath = _normalizeAssetPath(assetPath);
+    final withAssetsPrefix = 'assets/$relativePath';
+    if (kIsWeb) {
+      return [relativePath, withAssetsPrefix];
+    }
+    return [withAssetsPrefix, relativePath];
+  }
 
   factory AudioManager() {
     return _instance;
@@ -11,16 +33,37 @@ class AudioManager {
 
   AudioManager._internal() {
     _audioPlayer = AudioPlayer();
+    _sfxPlayer = AudioPlayer();
+  }
+
+  Future<void> _setAssetWithFallback(
+    AudioPlayer player,
+    String assetPath,
+    String logLabel,
+  ) async {
+    Object? lastError;
+    final candidates = _assetCandidates(assetPath);
+
+    for (final candidate in candidates) {
+      try {
+        log('$logLabel try -> $candidate', name: 'AudioManager');
+        await player.setAsset(candidate);
+        return;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    throw lastError ?? Exception('No playable asset key found: $assetPath');
   }
 
   // 播放音頻
   Future<void> play(String assetPath) async {
     try {
-      log('AudioManager: play -> $assetPath', name: 'AudioManager');
-      await _audioPlayer.setAsset(assetPath);
-      await _audioPlayer.play();
+      await _setAssetWithFallback(_bgmPlayer, assetPath, 'AudioManager: play');
+      await _bgmPlayer.play();
       log(
-        'AudioManager: playing -> ${_audioPlayer.playing}',
+        'AudioManager: playing -> ${_bgmPlayer.playing}',
         name: 'AudioManager',
       );
     } catch (e) {
@@ -28,38 +71,55 @@ class AudioManager {
     }
   }
 
+  Future<void> playSfx(String assetPath, {double volume = 1.0}) {
+    _sfxLock = _sfxLock.then((_) async {
+      try {
+        final player = _sfxPlayerSafe;
+        await player.stop();
+        await _setAssetWithFallback(player, assetPath, 'AudioManager: sfx');
+        await player.setLoopMode(LoopMode.off);
+        await player.setVolume(volume);
+        await player.seek(Duration.zero);
+        await player.play();
+      } catch (e) {
+        log('Error playing sfx: $e', name: 'AudioManager', error: e);
+      }
+    });
+    return _sfxLock;
+  }
+
   // 設置音量（0.0 - 1.0）
   Future<void> setVolume(double volume) async {
-    await _audioPlayer.setVolume(volume);
+    await _bgmPlayer.setVolume(volume);
   }
 
   // 獲取當前音量
   double getVolume() {
-    return _audioPlayer.volume;
+    return _bgmPlayer.volume;
   }
 
   // 停止播放
   Future<void> stop() async {
-    await _audioPlayer.stop();
+    await _bgmPlayer.stop();
   }
 
   // 暫停
   Future<void> pause() async {
-    await _audioPlayer.pause();
+    await _bgmPlayer.pause();
   }
 
   // 恢復播放
   Future<void> resume() async {
-    await _audioPlayer.play();
+    await _bgmPlayer.play();
   }
 
   // 設置循環播放
   Future<void> setLooping(bool loop) async {
-    await _audioPlayer.setLoopMode(loop ? LoopMode.all : LoopMode.off);
+    await _bgmPlayer.setLoopMode(loop ? LoopMode.all : LoopMode.off);
   }
 
   // 獲取播放器對象（用於獲取狀態）
-  AudioPlayer getPlayer() => _audioPlayer;
+  AudioPlayer getPlayer() => _bgmPlayer;
 
   // 處理淡出效果
   Future<void> fadeOut({
@@ -69,14 +129,14 @@ class AudioManager {
       'AudioManager: fadeOut start (duration: $duration)',
       name: 'AudioManager',
     );
-    final startVolume = _audioPlayer.volume;
+    final startVolume = _bgmPlayer.volume;
     final steps = 20;
     final stepDuration = duration ~/ steps;
 
     for (int i = 0; i <= steps; i++) {
       final progress = i / steps;
       final volume = startVolume * (1 - progress);
-      await _audioPlayer.setVolume(volume);
+      await _bgmPlayer.setVolume(volume);
       if (i < steps) {
         await Future.delayed(stepDuration);
       }
@@ -89,14 +149,14 @@ class AudioManager {
     Duration duration = const Duration(milliseconds: 1000),
     double targetVolume = 1.0,
   }) async {
-    await _audioPlayer.setVolume(0);
+    await _bgmPlayer.setVolume(0);
     final steps = 20;
     final stepDuration = duration ~/ steps;
 
     for (int i = 0; i <= steps; i++) {
       final progress = i / steps;
       final volume = targetVolume * progress;
-      await _audioPlayer.setVolume(volume);
+      await _bgmPlayer.setVolume(volume);
       if (i < steps) {
         await Future.delayed(stepDuration);
       }
