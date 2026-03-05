@@ -227,8 +227,7 @@ class _MainMenuState extends State<MainMenu> {
                               ),
                               const SizedBox(height: 20),
                               LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final compact = constraints.maxWidth < 900;
+                                builder: (context, _) {
                                   final controlsColumn = Container(
                                     padding: const EdgeInsets.all(14),
                                     decoration: BoxDecoration(
@@ -306,16 +305,6 @@ class _MainMenuState extends State<MainMenu> {
                                       ],
                                     ),
                                   );
-
-                                  if (compact) {
-                                    return Column(
-                                      children: [
-                                        controlsColumn,
-                                        const SizedBox(height: 14),
-                                        tipsColumn,
-                                      ],
-                                    );
-                                  }
 
                                   return Row(
                                     crossAxisAlignment:

@@ -6,10 +6,13 @@ class AudioManager {
   static final AudioManager _instance = AudioManager._internal();
   AudioPlayer? _audioPlayer;
   AudioPlayer? _sfxPlayer;
-  Future<void> _sfxLock = Future.value();
+  AudioPlayer? _shootSfxPlayer;
+  String? _loadedSfxAsset;
+  String? _loadedShootSfxAsset;
 
   AudioPlayer get _bgmPlayer => _audioPlayer ??= AudioPlayer();
   AudioPlayer get _sfxPlayerSafe => _sfxPlayer ??= AudioPlayer();
+  AudioPlayer get _shootSfxPlayerSafe => _shootSfxPlayer ??= AudioPlayer();
 
   String _normalizeAssetPath(String assetPath) {
     final normalized = assetPath.replaceAll('\\', '/');
@@ -34,6 +37,7 @@ class AudioManager {
   AudioManager._internal() {
     _audioPlayer = AudioPlayer();
     _sfxPlayer = AudioPlayer();
+    _shootSfxPlayer = AudioPlayer();
   }
 
   Future<void> _setAssetWithFallback(
@@ -71,21 +75,30 @@ class AudioManager {
     }
   }
 
-  Future<void> playSfx(String assetPath, {double volume = 1.0}) {
-    _sfxLock = _sfxLock.then((_) async {
-      try {
-        final player = _sfxPlayerSafe;
-        await player.stop();
+  Future<void> playSfx(String assetPath, {double volume = 1.0}) async {
+    try {
+      final normalized = _normalizeAssetPath(assetPath);
+      final bool isShootSfx = normalized == 'audio/soundEffect/shoot.wav';
+
+      final player = isShootSfx ? _shootSfxPlayerSafe : _sfxPlayerSafe;
+      final loadedAsset = isShootSfx ? _loadedShootSfxAsset : _loadedSfxAsset;
+
+      if (loadedAsset != normalized) {
         await _setAssetWithFallback(player, assetPath, 'AudioManager: sfx');
-        await player.setLoopMode(LoopMode.off);
-        await player.setVolume(volume);
-        await player.seek(Duration.zero);
-        await player.play();
-      } catch (e) {
-        log('Error playing sfx: $e', name: 'AudioManager', error: e);
+        if (isShootSfx) {
+          _loadedShootSfxAsset = normalized;
+        } else {
+          _loadedSfxAsset = normalized;
+        }
       }
-    });
-    return _sfxLock;
+
+      await player.setLoopMode(LoopMode.off);
+      await player.setVolume(volume);
+      await player.seek(Duration.zero);
+      await player.play();
+    } catch (e) {
+      log('Error playing sfx: $e', name: 'AudioManager', error: e);
+    }
   }
 
   // 設置音量（0.0 - 1.0）

@@ -146,7 +146,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
   double shootCooldownTimer = 0.0;
   final double shootCooldown = 0.2; // 0.2 秒射一次
   double _shootSfxCooldownTimer = 0.0;
-  static const double _shootSfxCooldown = 0.08;
+  static const double _shootSfxCooldown = 0.0;
 
   // 子彈無限發（手槍）/ 機槍彈藥
   bool hasMachineGun = false;
@@ -186,10 +186,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
 
     _setupZone(0);
     invulnerableTimer = 1.5;
-    // 延後播放，確保 audio context 已就緒
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      _playSfx('audio/soundEffect/missionStart.wav');
-    });
+    _playSfx('audio/soundEffect/missionStart.wav');
   }
 
   // ────────────────────────────────────────────────────────
@@ -349,7 +346,6 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
         playerVelocityX = 0;
         playerVelocityY = 0;
         invulnerableTimer = 1.5;
-        _playSfx('audio/soundEffect/missionStart.wav');
       }
       return;
     }
@@ -928,6 +924,65 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
     }
   }
 
+  void _drawReturnMenuButton(Canvas canvas) {
+    final double t = DateTime.now().millisecondsSinceEpoch / 1000.0;
+    final double pulse = (math.sin(t * 4.0) + 1) / 2;
+
+    final Rect glowRect = _returnButtonRect.inflate(2.0 + pulse * 1.8);
+    final RRect glowRRect = RRect.fromRectAndRadius(
+      glowRect,
+      const Radius.circular(18),
+    );
+    final RRect buttonRRect = RRect.fromRectAndRadius(
+      _returnButtonRect,
+      const Radius.circular(15),
+    );
+
+    canvas.drawRRect(
+      glowRRect,
+      Paint()..color = Colors.lightBlueAccent.withOpacity(0.18 + pulse * 0.14),
+    );
+
+    final Path buttonPath = Path()..addRRect(buttonRRect);
+    canvas.drawShadow(buttonPath, Colors.black.withOpacity(0.45), 7, false);
+
+    canvas.drawRRect(
+      buttonRRect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(_returnButtonRect.left, _returnButtonRect.top),
+          Offset(_returnButtonRect.right, _returnButtonRect.bottom),
+          [const Color(0xFF42A5F5), const Color(0xFF1E88E5)],
+        ),
+    );
+    canvas.drawRRect(
+      buttonRRect,
+      Paint()
+        ..color = Colors.white.withOpacity(0.9)
+        ..strokeWidth = 2.2
+        ..style = PaintingStyle.stroke,
+    );
+
+    TextPaint(
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 18,
+        fontWeight: FontWeight.w800,
+        shadows: [
+          Shadow(
+            color: Colors.black.withOpacity(0.45),
+            blurRadius: 4,
+            offset: const Offset(0, 1.5),
+          ),
+        ],
+      ),
+    ).render(
+      canvas,
+      '返回主選單',
+      Vector2(_returnButtonRect.left + 46, _returnButtonRect.top + 10),
+    );
+  }
+
   @override
   void render(Canvas canvas) {
     // 1. 計算縮放比例：將實際螢幕尺寸 (size.x, size.y) 除以你的遊戲邏輯尺寸 (800, 600)
@@ -1175,30 +1230,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
         Vector2(gameWidth / 2 - 92, gameHeight / 2 - 16),
       );
 
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(_returnButtonRect, const Radius.circular(15)),
-        Paint()
-          ..color = const Color(0xFF1E88E5)
-          ..style = PaintingStyle.fill,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(_returnButtonRect, const Radius.circular(15)),
-        Paint()
-          ..color = Colors.white
-          ..strokeWidth = 2.4
-          ..style = PaintingStyle.stroke,
-      );
-      TextPaint(
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
-      ).render(
-        canvas,
-        '返回主選單',
-        Vector2(_returnButtonRect.left + 15, _returnButtonRect.top + 8),
-      );
+      _drawReturnMenuButton(canvas);
     }
     // 3. 【放置在這裡】 浮動分數（保證在所有遊戲物件上方）
     // ---------------------------------------------------------
@@ -1242,14 +1274,14 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
       TextPaint(
         style: const TextStyle(
           color: Colors.yellow,
-          fontSize: 54,
+          fontSize: 40,
           fontWeight: FontWeight.bold,
-          letterSpacing: 2.8,
+          letterSpacing: 1.2,
         ),
       ).render(
         canvas,
         'MISSION COMPLETE',
-        Vector2(gameWidth / 2 - 228, gameHeight / 2 - 88),
+        Vector2(gameWidth / 2 - 178, gameHeight / 2 - 82),
       );
       TextPaint(
         style: const TextStyle(
@@ -1262,30 +1294,7 @@ class MetalSlugGame extends FlameGame with KeyboardEvents, TapDetector {
         'Score: $score',
         Vector2(gameWidth / 2 - 56, gameHeight / 2 - 18),
       );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(_returnButtonRect, const Radius.circular(15)),
-        Paint()
-          ..color = const Color(0xFF1E88E5)
-          ..style = PaintingStyle.fill,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(_returnButtonRect, const Radius.circular(15)),
-        Paint()
-          ..color = Colors.white
-          ..strokeWidth = 2.4
-          ..style = PaintingStyle.stroke,
-      );
-      TextPaint(
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
-      ).render(
-        canvas,
-        '返回主選單',
-        Vector2(_returnButtonRect.left + 15, _returnButtonRect.top + 8),
-      );
+      _drawReturnMenuButton(canvas);
     }
 
     // 3. 最後恢復畫布狀態
